@@ -1,8 +1,10 @@
 # SquawkersMcGraw
 Reverse engineering and remixing the Hasbro FurReal Friend "Squawkers McGraw" animatronic parrot
+![Squawkers McGraw Animatronic Parrot](Squawkers_McGraw.jpg)
 
-## Infrared Commands
-The following command strings were grabbed using an Arduino and the InfraRed signal analyser code described at https://www.patreon.com/posts/infrared-puzzle-28343366
+## Infrared Controller
+![Squawkers McGraw Contoller](Squawkers_Remote.png)
+The controller has a three position switch, three play mode buttons, 6 program buttons, and a custom record button. It appears to broadcast command strings using the common 38kHz carrier frequency. The following command strings were grabbed using an Arduino and the InfraRed signal analyser code described at https://www.patreon.com/posts/infrared-puzzle-28343366
 
 ### Response Mode
 ```
