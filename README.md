@@ -1,6 +1,7 @@
 # SquawkersMcGraw
 Reverse engineering and remixing the Hasbro FurReal Friend "Squawkers McGraw" animatronic parrot
-![Squawkers McGraw Animatronic Parrot](Squawkers_McGraw.jpg)
+<img src="Squawkers_McGraw.jpg" width="200" alt="Squawkers McGraw Animatronic Parrot" />
+
 
 ## Infrared Controller
 ![Squawkers McGraw Contoller](Squawkers_Remote.png)
