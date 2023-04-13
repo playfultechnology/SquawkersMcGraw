@@ -3,6 +3,21 @@ Reverse engineering and remixing the Hasbro FurReal Friend "Squawkers McGraw" an
 <img src="Squawkers_McGraw.jpg" width="300" alt="Squawkers McGraw Animatronic Parrot" />
 
 
+## Internals
+<table>
+<tr>
+<td><img src="images/head.jpg" width="300" alt="Squawkers McGraw Head" /></td>
+<td><img src="images/mainboard_front.jpg" width="300" alt="Squawkers McGraw Mainboard" /></td>
+<td><img src="images/mainboard_back.jpg" width="300" alt="Squawkers McGraw Mainboard (back)" /></td>
+</tr>
+</table>
+Squawkers features a variety of switches and sensors:
+- Light sensor (head), connected via Red, Black, Grey, White wires.
+- Tongue switch (head), connected via 2xBlue wires
+- Eyelid limit switches, connected via 2xOrange and 2xPurple wires.
+
+Eyelid and mouth movement are both controlled from the same DC hobby motor, connected via slightly thicker Blue and Purple wires.
+
 ## Infrared Controller
 <img src="Squawkers_Remote.png" width="300" alt="Squawkers McGraw Contoller" />
 
