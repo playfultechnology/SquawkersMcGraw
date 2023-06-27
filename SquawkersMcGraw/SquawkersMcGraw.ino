@@ -1,26 +1,28 @@
 /**
- * "Squawkers MGraw" Animatronic Controller
+ * "Squawkers McGraw" Animatronic Controller
+ * Copyright (c) 2023 Playful Technology 
  */
 
 // INCLUDES
+// For debouncing button input. See https://github.com/LennartHennigs/Button2
 #include "Button2.h"
 
-enum EyeState {Open, Closing, Neutral, Closed, Opening};
+// ENUMS
+// Define the states through which the parrot's eyes and body moves
+enum EyeState { Open, Closing, Neutral, Closed, Opening };
 EyeState eyeState = EyeState::Neutral;
-
-// Movement patterns
-// Neutral, (FlapWingsHeadDown), (lookRightHeadUp), (HeadLeft), NeutralFlapWing
+enum BodyState { Neutral, FlapWingsHeadDown, LookRightHeadUp, HeadLeft, NeutralFlapWing };
 
 // CONSTANTS
 // Outpin pins
-byte headMotorPins[] = {4, 5}; // Blue/Purple
-byte bodyMotorPins[] = {6, 7};
+byte headMotorPins[] = {4, 5}; // Blue/Purple wires
+byte bodyMotorPins[] = {6, 7}; // White/Grey wires
 // Sensor pins
 const byte numSensors = 4;
 const byte tonguePin = 8; // Blue wire to head
 const byte eyesClosedPin = 10; // Orange wire
 const byte eyesOpenPin = 11; // Purple wire
-const byte legPin = 12;
+const byte legPin = 12; // Blue wire
 const byte sensorPins[numSensors] = {tonguePin, eyesClosedPin, eyesOpenPin, legPin};
 // Input pins
 const byte numButtons = 2;
@@ -54,7 +56,7 @@ void setup() {
     sensors[i].setDebounceTime(1);
     sensors[i].setChangedHandler(sensorChanged);
   }
-
+  // We don't know what state the eyes are in when we first startup
   calibrateEyes();
 }
 
@@ -135,7 +137,6 @@ void blink(){
   unsigned long now = millis();
   digitalWrite(headMotorPins[0], HIGH);
   analogWrite(headMotorPins[1], LOW);
-  // Attempt to calibrate for a maximum of 5 seconds
   while(millis() - now < 1000){
     int closed = !digitalRead(eyesClosedPin);
     int open = !digitalRead(eyesOpenPin);
@@ -170,14 +171,14 @@ void btnReleased(Button2& btn) {
     Serial.println("Btn[1] released");
   }
 }
-
+// Spinning head motor in one direction opens mouth
 void openMouth(){
   Serial.println(F("Open Mouth"));
   digitalWrite(headMotorPins[0], LOW);
   digitalWrite(headMotorPins[1], HIGH);
   digitalWrite(LED_BUILTIN, HIGH);
 }
-
+// Mouth is sprung so will automatically close when head motor is unpowered
 void closeMouth(){
   Serial.println(F("Close Mouth"));
   digitalWrite(headMotorPins[0], LOW);
@@ -185,13 +186,13 @@ void closeMouth(){
   digitalWrite(LED_BUILTIN, LOW);
 }
 
-// Ends with head low and to the side
+// Cycle through movement patterns in specified direction
 void moveBody(int dir=0){
   Serial.println(F("Move"));
   digitalWrite(bodyMotorPins[0], dir);
   digitalWrite(bodyMotorPins[1], 1-dir);
 }
-
+// Stop all body movement
 void stopMoving(){
   Serial.println(F("Stop"));
   digitalWrite(bodyMotorPins[0], LOW);
@@ -199,27 +200,20 @@ void stopMoving(){
 }
 
 void loop() {
-  // Read any input
-  char command;
-  bool cmdReceived = false;
-  if(Serial.available() > 0){
-    // Read any integer sent
-    command = Serial.read();
-    cmdReceived = true;
-  }
+	
+  // Note that responding to digital button inputs and handling sensor changes
+  // are done in callback methods above (btnPressed, btnReleased, and sensorChanged)
+  // so are not in loop()
 
+  // Handle Joystick Input
   if(analogRead(joystickPins[0]) < 100) {
     Serial.println("Down");
     closeEyes();
-    digitalWrite(LED_BUILTIN, HIGH);
   }
   else if(analogRead(joystickPins[0]) > 900) {
     Serial.println("Up");    
     openEyes();
   }
-  else {
-  }
-  
   if(analogRead(joystickPins[1]) < 100) {
     //Serial.println("Left");
     moveBody(0);
@@ -228,10 +222,16 @@ void loop() {
     //Serial.println("Right");
     moveBody(1);
   }
-  else {
-    ;
+
+  // For debugging, we will also accept commands sent over the Serial connection
+  // Read any input
+  char command;
+  bool cmdReceived = false;
+  if(Serial.available() > 0){
+    // Read any single character sent
+    command = Serial.read();
+    cmdReceived = true;
   }
-  
   if(cmdReceived){
     switch(command){
       case '0':
