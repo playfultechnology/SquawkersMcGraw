@@ -105,4 +105,5 @@ To completely customise the parrot's behaviour requires a more destructive modif
 
 <img src="images/Squawkers McGraw Wiring_bb.jpg" width="800" alt="Squawkers McGraw Wiring" />
 
-The code used to control such a modified controller is demonstrated in an Arduino .ino sketch in this repository.
+
+Note that each of the sensors illustrated actually consists of a pair of wires - one input signal, and one ground wire (with the controller having onboard INPUT_PULLUPs for when the inputs are not triggered). The code used to control such a modified controller is demonstrated in an Arduino .ino sketch in this repository.
