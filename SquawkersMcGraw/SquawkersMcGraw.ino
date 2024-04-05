@@ -11,7 +11,7 @@
 // Define the states through which the parrot's eyes and body moves
 enum EyeState { Open, Closing, Neutral, Closed, Opening };
 EyeState eyeState = EyeState::Neutral;
-enum BodyState { Neutral, FlapWingsHeadDown, LookRightHeadUp, HeadLeft, NeutralFlapWing };
+enum BodyState { bdyNeutral, bdyFlapWingsHeadDown, bdyLookRightHeadUp, bdyHeadLeft, bdyNeutralFlapWing };
 
 // CONSTANTS
 // Outpin pins
