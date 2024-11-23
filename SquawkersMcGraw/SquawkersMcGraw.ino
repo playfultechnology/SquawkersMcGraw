@@ -6,6 +6,9 @@
 // INCLUDES
 // For debouncing button input. See https://github.com/LennartHennigs/Button2
 #include "Button2.h"
+#include <U8g2lib.h>
+// using the ESP32 built-in bluetooth, so no need for serial Bluetooth connection to, e.g. HC-05
+#include "BluetoothSerial.h"
 
 // ENUMS
 // Define the states through which the parrot's eyes and body moves
@@ -15,33 +18,54 @@ enum BodyState { bdyNeutral, bdyFlapWingsHeadDown, bdyLookRightHeadUp, bdyHeadLe
 
 // CONSTANTS
 // Outpin pins
-byte headMotorPins[] = {4, 5}; // Blue/Purple wires
-byte bodyMotorPins[] = {6, 7}; // White/Grey wires
+byte headMotorPins[] = {27, 26, 25}; // Blue/Purple wires
+byte bodyMotorPins[] = {14, 12, 13}; // White/Grey wires
 // Sensor pins
 const byte numSensors = 4;
-const byte tonguePin = 8; // Blue wire to head
-const byte eyesClosedPin = 10; // Orange wire
-const byte eyesOpenPin = 11; // Purple wire
-const byte legPin = 12; // Blue wire
+const byte tonguePin = 36; // Blue wire to head
+const byte eyesClosedPin = 39; // Orange wire
+const byte eyesOpenPin = 34; // Purple wire
+const byte legPin = 35; // Blue wire
 const byte sensorPins[numSensors] = {tonguePin, eyesClosedPin, eyesOpenPin, legPin};
 // Input pins
+/*
 const byte numButtons = 2;
 const byte btnPins[] = {A2, A5}; // Top button, Joystick click-in button
 const byte joystickPins[] = {A3, A4};
-
+*/
 // GLOBALS
-Button2 buttons[numButtons];
+//Button2 buttons[numButtons];
 Button2 sensors[numSensors];
+// Initialize Serial1 for Bluetooth communication on GPIO 16 (Rx) and GPIO 17 (Tx)
+//HardwareSerial BTSerial(2);  // Use Serial2 for Bluetooth
+BluetoothSerial BTSerial;
+// Initialize the U8g2 library with I2C connection on GPIO 32 (SDA) and GPIO 33 (SCL)
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 33, /* data=*/ 32);
+
 
 void setup() {
   Serial.begin(115200);
   Serial.println(__FILE__ __DATE__);
+
+  // Initialize the OLED display
+  u8g2.begin();
+  u8g2.clearBuffer();
+  u8g2.setFont(u8g2_font_simple1_tr); // Choose a font size that fits your display
+  
+  // Initialize Bluetooth Serial
+  //BTSerial.begin(115200, SERIAL_8N1, 16, 17); // Baud rate 9600, Rx=16, Tx=17
+  BTSerial.begin("SquawkersMcGraw");
+
+  // Display welcome message on the OLED
+  u8g2.drawStr(0, 10, "Waiting for BT data...");
+  u8g2.sendBuffer();
 
   // Motors
   for(int i=0; i<2; i++){
     pinMode(headMotorPins[i], OUTPUT);  
     pinMode(bodyMotorPins[i], OUTPUT);
   }
+  /*
   // Buttons
   for(int i=0; i<numButtons; i++) {
     pinMode(btnPins[i], INPUT_PULLUP);
@@ -49,6 +73,7 @@ void setup() {
     buttons[i].setPressedHandler(btnPressed);
     buttons[i].setReleasedHandler(btnReleased);
   }
+  */
   // Sensors
   for(int i=0; i<numSensors; i++){
     pinMode(sensorPins[i], INPUT_PULLUP);
@@ -111,7 +136,9 @@ void calibrateEyes(){
   Serial.print(F("timeout"));
 }
 void openEyes(){
-  Serial.println(F("Open Eyes"));
+  Serial.println(F("Open Eyes"));  
+  u8g2.drawStr(0, 10, "Opening eyes...");
+  u8g2.sendBuffer();
   if(eyeState != EyeState::Open) {
     digitalWrite(headMotorPins[0], LOW);
     // 0-255. Set higher values to increase speed
@@ -120,7 +147,9 @@ void openEyes(){
   }
 }
 void closeEyes(){
-  Serial.println(F("Close Eyes"));
+  Serial.println(F("Close Eyes"));  
+  u8g2.drawStr(0, 10, "Closing Eyes...");
+  u8g2.sendBuffer();
     if(eyeState != EyeState::Closed) {
     digitalWrite(headMotorPins[0], HIGH);
     // 0-255 Set lower values to increase speed
@@ -133,7 +162,9 @@ void stopEyes(){
   digitalWrite(headMotorPins[1], LOW);
 }
 void blink(){
-  Serial.print(F("Blinking"));
+  Serial.print(F("Blinking"));  
+  u8g2.drawStr(0, 10, "Blinking...");
+  u8g2.sendBuffer();
   unsigned long now = millis();
   digitalWrite(headMotorPins[0], HIGH);
   analogWrite(headMotorPins[1], LOW);
@@ -147,7 +178,7 @@ void blink(){
   }
   stopEyes();
 }
-
+/*
 void btnPressed(Button2& btn) {
   // Top button
   if(btn == buttons[0]){
@@ -171,9 +202,12 @@ void btnReleased(Button2& btn) {
     Serial.println("Btn[1] released");
   }
 }
+*/
 // Spinning head motor in one direction opens mouth
 void openMouth(){
   Serial.println(F("Open Mouth"));
+  u8g2.drawStr(0, 10, "Opening Mouth");
+  u8g2.sendBuffer();  
   digitalWrite(headMotorPins[0], LOW);
   digitalWrite(headMotorPins[1], HIGH);
   digitalWrite(LED_BUILTIN, HIGH);
@@ -181,6 +215,8 @@ void openMouth(){
 // Mouth is sprung so will automatically close when head motor is unpowered
 void closeMouth(){
   Serial.println(F("Close Mouth"));
+  u8g2.drawStr(0, 10, "Closing Mouth...");
+  u8g2.sendBuffer();
   digitalWrite(headMotorPins[0], LOW);
   digitalWrite(headMotorPins[1], LOW);
   digitalWrite(LED_BUILTIN, LOW);
@@ -189,23 +225,29 @@ void closeMouth(){
 // Cycle through movement patterns in specified direction
 void moveBody(int dir=0){
   Serial.println(F("Move"));
+  u8g2.drawStr(0, 10, "Moving...");
+  u8g2.sendBuffer();
   digitalWrite(bodyMotorPins[0], dir);
   digitalWrite(bodyMotorPins[1], 1-dir);
 }
 // Stop all body movement
 void stopMoving(){
-  Serial.println(F("Stop"));
+  Serial.println(F("Stop"));  
+  u8g2.drawStr(0, 10, "Stopping...");
+  u8g2.sendBuffer();
   digitalWrite(bodyMotorPins[0], LOW);
   digitalWrite(bodyMotorPins[1], LOW);
 }
 
 void loop() {
-	
+
+
   // Note that responding to digital button inputs and handling sensor changes
   // are done in callback methods above (btnPressed, btnReleased, and sensorChanged)
   // so are not in loop()
 
   // Handle Joystick Input
+  /*
   if(analogRead(joystickPins[0]) < 100) {
     Serial.println("Down");
     closeEyes();
@@ -222,7 +264,7 @@ void loop() {
     //Serial.println("Right");
     moveBody(1);
   }
-
+  */
   // For debugging, we will also accept commands sent over the Serial connection
   // Read any input
   char command;
@@ -230,6 +272,11 @@ void loop() {
   if(Serial.available() > 0){
     // Read any single character sent
     command = Serial.read();
+    cmdReceived = true;
+  }
+  // Check if data is available on Bluetooth
+  else if(BTSerial.available()) {
+    command = BTSerial.read();
     cmdReceived = true;
   }
   if(cmdReceived){
@@ -240,6 +287,7 @@ void loop() {
       case '3':
         break;
       case '4':
+        blink();
         break;
       case '5':
         openEyes();
@@ -255,6 +303,6 @@ void loop() {
         break;
     }
   }
-  for(int i=0; i<numButtons; i++){ buttons[i].loop(); }
+  //for(int i=0; i<numButtons; i++){ buttons[i].loop(); }
   for(int i=0; i<numSensors; i++){ sensors[i].loop(); }
 }
