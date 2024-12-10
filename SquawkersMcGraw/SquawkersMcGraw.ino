@@ -13,11 +13,11 @@
 // ENUMS
 // Define the states through which the parrot's eyes and body moves
 enum EyeState { Open, Closing, Neutral, Closed, Opening };
-EyeState eyeState = EyeState::Neutral;
 enum BodyState { bdyNeutral, bdyFlapWingsHeadDown, bdyLookRightHeadUp, bdyHeadLeft, bdyNeutralFlapWing };
 
 // CONSTANTS
 // Outpin pins
+// TP6612 motor driver has 3 pins per channel. IN1/IN2/PWM
 byte bodyMotorPins[] = {27, 26, 25}; // White/Grey wires
 byte headMotorPins[] = {12, 14, 13}; // Blue/Purple wires
 // Sensor pins
@@ -27,26 +27,25 @@ const byte eyesClosedPin = 39; // Orange wire
 const byte eyesOpenPin = 34; // Purple wire
 const byte legPin = 35; // Blue wire
 const byte sensorPins[numSensors] = {tonguePin, eyesClosedPin, eyesOpenPin, legPin};
-// Input pins
-/*
-const byte numButtons = 2;
-const byte btnPins[] = {A2, A5}; // Top button, Joystick click-in button
-const byte joystickPins[] = {A3, A4};
-*/
+
 // GLOBALS
-//Button2 buttons[numButtons];
 Button2 sensors[numSensors];
-// Initialize Serial1 for Bluetooth communication on GPIO 16 (Rx) and GPIO 17 (Tx)
-//HardwareSerial BTSerial(2);  // Use Serial2 for Bluetooth
-BluetoothSerial BTSerial;
+#ifdef ESP32
+  BluetoothSerial BTSerial;
+#else
+// Initialize Serial2 for Bluetooth communication on GPIO 16 (Rx) and GPIO 17 (Tx)
+// HardwareSerial BTSerial(2);  // Use Serial2 for Bluetooth
+#endif
 // Initialize the U8g2 library with I2C connection on GPIO 32 (SDA) and GPIO 33 (SCL)
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 33, /* data=*/ 32);
+// Keep track of current position
 int8_t lastBodyMovement = 0;
-
 bool wingsOpen = true;
+EyeState eyeState = EyeState::Neutral;
 
 void setup() {
   Serial.begin(115200);
+  delay(1000);
   Serial.println(__FILE__ __DATE__);
 
   // Initialize the OLED display
@@ -55,8 +54,14 @@ void setup() {
   u8g2.setFont(u8g2_font_simple1_tr); // Choose a font size that fits your display
   
   // Initialize Bluetooth Serial
-  //BTSerial.begin(115200, SERIAL_8N1, 16, 17); // Baud rate 9600, Rx=16, Tx=17
-  BTSerial.begin("SquawkersMcGraw");
+  #ifdef ESP32
+    // Built-in Bluetooth interface needs only advertised name
+    BTSerial.begin("SquawkersMcGraw");
+  #else
+    // If using an external Bluetooth module (e.g. HC-05), specify the parameters
+    // of the serial interface to it - baud rate, Rx, Tx pin
+    BTSerial.begin(9600, SERIAL_8N1, 8, 9);
+  #endif
 
   // Display welcome message on the OLED
   u8g2.drawStr(0, 10, "Waiting for BT data...");
@@ -67,18 +72,10 @@ void setup() {
     pinMode(headMotorPins[i], OUTPUT);  
     pinMode(bodyMotorPins[i], OUTPUT);
   }
+  // Set PWM speed for motor movements
   digitalWrite(headMotorPins[2], HIGH);
   digitalWrite(bodyMotorPins[2], HIGH);
   
-  /*
-  // Buttons
-  for(int i=0; i<numButtons; i++) {
-    pinMode(btnPins[i], INPUT_PULLUP);
-    buttons[i].begin(btnPins[i]);
-    buttons[i].setPressedHandler(btnPressed);
-    buttons[i].setReleasedHandler(btnReleased);
-  }
-  */
   // Sensors
   for(int i=0; i<numSensors; i++){
     pinMode(sensorPins[i], INPUT_PULLUP);
@@ -88,7 +85,7 @@ void setup() {
   }
   // We don't know what state the eyes are in when we first startup
   calibrateEyes();
-
+  delay(500);
   calibrateBody();
 }
 
@@ -124,14 +121,24 @@ void sensorChanged(Button2& sensor) {
   }
 }
 
-// TODO
-// This fails if eyes are in closed state when called
+EyeState getEyeState(){
+  
+}
+
+
+/* Calibrate eyes into the neutral position 
 void calibrateEyes(){
   Serial.print(F("Calibrating eyes..."));
   unsigned long now = millis();
-  digitalWrite(headMotorPins[0], HIGH);
-  digitalWrite(headMotorPins[1], LOW);
-  digitalWrite(headMotorPins[2], HIGH);
+  // First, shut eyes
+  closeEyes();
+  delay(100);
+  
+  stopEyes();
+  delay(100);
+  // Then, attempt to open them
+  openEyes();
+
   // Attempt to calibrate for a maximum of 2 seconds
   while(millis() - now < 2000){
     int closed = !digitalRead(eyesClosedPin);
@@ -192,31 +199,7 @@ void blink(){
   }
   stopEyes();
 }
-/*
-void btnPressed(Button2& btn) {
-  // Top button
-  if(btn == buttons[0]){
-    Serial.println("Btn[0] pressed");
-    openMouth();
-  }
-  // Joystick click button
-  else if(btn == buttons[1]){    
-    Serial.println("Btn[1] pressed");
-    blink();
-  }
-}
-void btnReleased(Button2& btn) {
-  // Top button
-  if(btn == buttons[0]){
-    Serial.println("Btn[0] released");
-    closeMouth();
-  }
-  // Joystick click button
-  else if(btn == buttons[1]){    
-    Serial.println("Btn[1] released");
-  }
-}
-*/
+
 // Spinning head motor in one direction opens mouth
 void openMouth(){
   Serial.println(F("Open Mouth"));
@@ -238,20 +221,11 @@ void closeMouth(){
   digitalWrite(LED_BUILTIN, LOW);
 }
 
-
-
-
 /*
 A <- MOVEMENT A <-Slight Wiggle -> MOVEMENT B -> B -> B
 |         ^
 \----------
 */
-
-
-
-
-
-
 // Cycle through movement patterns in specified direction
 void moveBody(int dir=0){
   Serial.println(F("Move"));
@@ -272,48 +246,30 @@ void stopMoving(){
   digitalWrite(bodyMotorPins[1], LOW);
   digitalWrite(bodyMotorPins[2], LOW);
 }
+// To flap wings, we move body in the opposite direction to last time it was moved
 void flap(){
   moveBody(1-lastBodyMovement);
 }
+// These are more limited versions of flap()
 void shutWings(){
   if(wingsOpen){
     moveBody(0);
   }
 }
+// These are more limited versions of flap()
 void openWings(){
   if(!wingsOpen){
     moveBody(1);
   }
 }
+// Move the body so we know the position it ends in
 void calibrateBody(){
   moveBody(0);
 }
 void loop() {
-
-
   // Note that responding to digital button inputs and handling sensor changes
   // are done in callback methods above (btnPressed, btnReleased, and sensorChanged)
   // so are not in loop()
-
-  // Handle Joystick Input
-  /*
-  if(analogRead(joystickPins[0]) < 100) {
-    Serial.println("Down");
-    closeEyes();
-  }
-  else if(analogRead(joystickPins[0]) > 900) {
-    Serial.println("Up");    
-    openEyes();
-  }
-  if(analogRead(joystickPins[1]) < 100) {
-    //Serial.println("Left");
-    moveBody(0);
-  }
-  else if(analogRead(joystickPins[1]) > 900) {
-    //Serial.println("Right");
-    moveBody(1);
-  }
-  */
   // For debugging, we will also accept commands sent over the Serial connection
   // Read any input
   char command;
@@ -384,6 +340,5 @@ void loop() {
         break;
     }
   }
-  //for(int i=0; i<numButtons; i++){ buttons[i].loop(); }
   for(int i=0; i<numSensors; i++){ sensors[i].loop(); }
 }
