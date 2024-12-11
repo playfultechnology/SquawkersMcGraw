@@ -83,8 +83,8 @@ void setup() {
     sensors[i].setDebounceTime(1);
     sensors[i].setChangedHandler(sensorChanged);
   }
-  // We don't know what state the eyes are in when we first startup
-  calibrateEyes();
+
+  openEyes();
   delay(500);
   calibrateBody();
 }
@@ -99,19 +99,7 @@ void sensorChanged(Button2& sensor) {
     stopMoving();
   }
   else if(sensor.getPin() == eyesOpenPin || sensor.getPin() == eyesClosedPin) {
-    if(digitalRead(eyesClosedPin) && !digitalRead(eyesOpenPin)){
-      Serial.println("Eyes Open");
-      eyeState = EyeState::Open;
-    }
-    else if(digitalRead(eyesClosedPin) && digitalRead(eyesOpenPin)){
-      Serial.println("Eyes Neutral");
-      eyeState = EyeState::Neutral;
-    }
-    else if(!digitalRead(eyesClosedPin) && digitalRead(eyesOpenPin)){
-      Serial.println("Eyes Closed");
-      eyeState = EyeState::Closed;
-    }
-    stopEyes();  
+    eyeState = getEyeState();
   }
 
   // DEBUG - print current status of all sensors  
@@ -119,88 +107,88 @@ void sensorChanged(Button2& sensor) {
     Serial.print(digitalRead(sensorPins[i]));
     Serial.print(i==numSensors-1 ? "\r\n" : ",");
   }
+  // TESTING!
+  // For stepping through head motor movement
+  //stopEyes();
 }
 
 EyeState getEyeState(){
-  
-}
-
-
-/* Calibrate eyes into the neutral position 
-void calibrateEyes(){
-  Serial.print(F("Calibrating eyes..."));
-  unsigned long now = millis();
-  // First, shut eyes
-  closeEyes();
-  delay(100);
-  
-  stopEyes();
-  delay(100);
-  // Then, attempt to open them
-  openEyes();
-
-  // Attempt to calibrate for a maximum of 2 seconds
-  while(millis() - now < 2000){
-    int closed = !digitalRead(eyesClosedPin);
-    int open = !digitalRead(eyesOpenPin);
-    if(!closed && !open) {
-      stopEyes();
-      Serial.print(F("done!"));      
-      return;
+  if(digitalRead(eyesClosedPin) && !digitalRead(eyesOpenPin)){
+      Serial.println("Eyes Open");
+      return EyeState::Open;
     }
-  }
-  stopEyes();
-  Serial.print(F("timeout"));
+    else if(digitalRead(eyesClosedPin) && digitalRead(eyesOpenPin)){
+      Serial.println("Eyes Neutral");
+      return EyeState::Neutral;
+    }
+    else if(!digitalRead(eyesClosedPin) && digitalRead(eyesOpenPin)){
+      Serial.println("Eyes Closed");
+      return EyeState::Closed;
+    }
+    // Default
+    Serial.print("ERROR: Could not determine eye state");
+    return EyeState::Neutral;
 }
+
 void openEyes(){
   Serial.println(F("Open Eyes"));  
   u8g2.drawStr(0, 10, "Opening eyes...");
   u8g2.sendBuffer();
-  if(eyeState != EyeState::Open) {
+  unsigned long now = millis();
+  // Open eyes one step
+  while((millis() - now < 250) && (eyeState != EyeState::Open)){
     digitalWrite(headMotorPins[0], LOW);
     // 0-255. Set higher values to increase speed
     digitalWrite(headMotorPins[2], HIGH);
     digitalWrite(headMotorPins[1], HIGH);
-    eyeState = EyeState::Opening;
+   // eyeState = EyeState::Opening;
   }
+  stopEyes();
 }
 void closeEyes(){
   Serial.println(F("Close Eyes"));  
   u8g2.drawStr(0, 10, "Closing Eyes...");
   u8g2.sendBuffer();
-  if(eyeState != EyeState::Closed) {
+  unsigned long now = millis();
+  while((millis() - now < 100) && (eyeState != EyeState::Closed)){
     digitalWrite(headMotorPins[0], HIGH);
     // 0-255 Set lower values to increase speed
     digitalWrite(headMotorPins[1], LOW);
     analogWrite(headMotorPins[2], 64);
-    eyeState = EyeState::Closing;
+    //eyeState = EyeState::Closing;
   }
+  stopEyes();
 }
 void stopEyes(){
   digitalWrite(headMotorPins[0], LOW);
   digitalWrite(headMotorPins[1], LOW);
   digitalWrite(headMotorPins[2], LOW);
 }
+/**
+/* Note: BLINKING is the opposite of TALKING
+ */
 void blink(){
   Serial.print(F("Blinking"));  
   u8g2.drawStr(0, 10, "Blinking...");
   u8g2.sendBuffer();
   unsigned long now = millis();
-  digitalWrite(headMotorPins[0], HIGH);
-  digitalWrite(headMotorPins[1], LOW);
-  digitalWrite(headMotorPins[2], HIGH);
-  while(millis() - now < 1000){
-    int closed = !digitalRead(eyesClosedPin);
-    int open = !digitalRead(eyesOpenPin);
-    if(!closed && !open) {
-      stopEyes();      
-      return;
-    }
+  // Close eyes all the way
+  while((millis() - now < 200) && (eyeState != EyeState::Closed)){
+    digitalWrite(headMotorPins[0], HIGH);
+    digitalWrite(headMotorPins[1], LOW);
+    digitalWrite(headMotorPins[2], 64);
+  }
+  // Open eyes all the way
+  while((millis() - now < 400) && (eyeState != EyeState::Open)){
+    digitalWrite(headMotorPins[0], LOW);
+    digitalWrite(headMotorPins[1], HIGH);
+    digitalWrite(headMotorPins[2], 64);
   }
   stopEyes();
 }
 
 // Spinning head motor in one direction opens mouth
+// (will also open eyes)
 void openMouth(){
   Serial.println(F("Open Mouth"));
   u8g2.drawStr(0, 10, "Opening Mouth");
@@ -219,6 +207,42 @@ void closeMouth(){
   digitalWrite(headMotorPins[1], LOW);
   digitalWrite(headMotorPins[2], LOW);
   digitalWrite(LED_BUILTIN, LOW);
+}
+
+void talk(){
+  Serial.print(F("Talking"));  
+  unsigned long now = millis();
+  EyeState previousEyeState = eyeState;
+  // Open mouth (and eyes)
+  while((millis() - now < 100)){
+    digitalWrite(headMotorPins[0], LOW);
+    digitalWrite(headMotorPins[1], HIGH);
+    digitalWrite(headMotorPins[2], HIGH);
+  }
+  // Close mouth again until returned to previous eye state
+  while((millis() - now < 200 && eyeState != previousEyeState)){
+    digitalWrite(headMotorPins[0], HIGH);
+    digitalWrite(headMotorPins[1], LOW);
+    digitalWrite(headMotorPins[2], HIGH);
+  }
+  // Stop
+  digitalWrite(headMotorPins[0], LOW);
+  digitalWrite(headMotorPins[1], LOW);
+  digitalWrite(headMotorPins[2], LOW);
+
+}
+
+// Cycle through movement patterns in specified direction
+//<0   1>
+//Mouth Open (no sensor) <> Eyes Open <> Neutral Eyes <> Eyes Closed <> Eyes straining to be _really_ closed (from this state, 0 goes back to OPEN though, not neutral....)
+
+void moveHead(int dir=0){
+  Serial.println(F("Move head"));
+  u8g2.drawStr(0, 10, "Moving...");
+  u8g2.sendBuffer();
+  digitalWrite(headMotorPins[0], dir);
+  digitalWrite(headMotorPins[1], 1-dir);
+  digitalWrite(headMotorPins[2], 128);
 }
 
 /*
@@ -305,18 +329,13 @@ void loop() {
         shutWings();
         break;
       case 't':
-        openMouth();
-        delay(100);
-        closeMouth();
-        break;
-      case '0':
-        calibrateEyes();
+        talk();
         break;
       case '1':
-        openMouth();
+        moveHead(0);
         break;
       case '2':
-        closeMouth();
+        moveHead(1);
         break;  
       case '3':
         openMouth();
