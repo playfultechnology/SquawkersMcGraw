@@ -210,7 +210,9 @@ void closeMouth(){
 }
 
 void talk(){
-  Serial.print(F("Talking"));  
+  Serial.print(F("Talking"));
+  // Open eyes first....
+  openEyes();
   unsigned long now = millis();
   EyeState previousEyeState = eyeState;
   // Open mouth (and eyes)
